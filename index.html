@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>미구매 문자 자동완성 툴</title>
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --text: #111827;
+      --card: white;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --border: #d1d5db;
+      --success: #10b981;
+      --success-hover: #059669;
+      --danger: #ef4444;
+      --warn: #f97316;
+      --warn-hover: #ea580c;
+    }
+
+    body.dark {
+      --bg: #1f2937;
+      --text: #f9fafb;
+      --card: #374151;
+      --primary: #60a5fa;
+      --primary-hover: #3b82f6;
+      --border: #4b5563;
+      --success: #34d399;
+      --success-hover: #10b981;
+      --danger: #f87171;
+      --warn: #fb923c;
+      --warn-hover: #f97316;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      background-color: var(--primary);
+      color: white;
+      padding: 20px;
+      text-align: center;
+      font-size: 20px;
+      font-weight: bold;
+      position: relative;
+    }
+
+    #darkModeToggle {
+      position: absolute;
+      right: 20px;
+      top: 20px;
+      font-size: 18px;
+      background: none;
+      border: none;
+      color: white;
+      cursor: pointer;
+    }
+
+    .top-bar {
+      background-color: #e5e7eb;
+      padding: 12px 30px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+    }
+
+    body.dark .top-bar {
+      background-color: #374151;
+    }
+
+    .top-bar label {
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    #branch, #modeSelect, #adminPassword, #productSearch {
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      font-size: 14px;
+      background: white;
+      color: #111;
+    }
+
+    #branch {
+      width: 150px;
+    }
+
+    #modeSelect {
+      min-width: 110px;
+    }
+
+    #adminPassword {
+      width: 140px;
+    }
+    
+    #productSearch {
+      margin-left: auto; /* Push search bar to the right */
+      width: 200px;
+    }
+
+    body.dark #branch,
+    body.dark #modeSelect,
+    body.dark #adminPassword,
+    body.dark #productSearch {
+      background: #1f2937;
+      color: white;
+      border: 1px solid var(--border);
+    }
+
+    #adminLoginBtn {
+      background: var(--primary);
+      color: white;
+      border-radius: 6px;
+      border: none;
+      padding: 10px 20px;
+      font-size: 15px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    #adminLoginBtn:hover {
+      background: var(--primary-hover);
+    }
+
+    .grid {
+      display: flex;
+      flex-wrap: wrap;
+      padding: 20px 30px;
+      gap: 20px;
+    }
+
+    .category {
+      width: 200px;
+      background: var(--card);
+      padding: 15px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    .category-header {
+      position: sticky;
+      top: 0;
+      background: var(--card);
+      font-weight: bold;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+      z-index: 1;
+    }
+
+    .product-button {
+      color: black;
+      display: block;
+      width: 100%;
+      padding: 8px 12px;
+      margin: 6px 0;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #f3f4f6;
+      cursor: pointer;
+      font-size: 14px;
+      text-align: left;
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    .product-button.selected {
+      background-color: var(--primary);
+      color: white;
+      border-color: var(--primary-hover);
+    }
+
+    #output {
+      margin: 0 30px;
+      background-color: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      min-height: 300px;
+      white-space: pre-wrap;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .buttons {
+      display: flex;
+      justify-content: flex-end;
+      margin: 20px 30px;
+      gap: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 15px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      color: white;
+    }
+
+    #deselectBtn {
+      background: var(--warn);
+    }
+    #deselectBtn:hover {
+      background: var(--warn-hover);
+    }
+
+    #generateBtn {
+      background: var(--primary);
+    }
+
+    #generateBtn:hover {
+      background: var(--primary-hover);
+    }
+
+    #copyBtn {
+      background: var(--success);
+      display: none;
+    }
+
+    #copyBtn:hover {
+      background: var(--success-hover);
+    }
+
+    .admin-panel {
+      display: none;
+      margin: 30px;
+      padding: 20px;
+      background: #fefce8;
+      border: 1px solid #facc15;
+      border-radius: 10px;
+    }
+
+    body.dark .admin-panel {
+      background: #4b5563;
+      border-color: #facc15;
+    }
+
+    .admin-panel input {
+      width: calc(33% - 12px);
+      margin-right: 12px;
+      margin-bottom: 10px;
+    }
+
+    .admin-panel button {
+      background: var(--primary);
+    }
+
+    .admin-list {
+      margin-top: 20px;
+    }
+
+    /* 관리자 모드 카테고리 접기/펴기 스타일 추가 */
+    .brand-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--card);
+      cursor: grab;
+    }
+    .brand-item .toggle-btn {
+      cursor: pointer;
+      font-size: 1.2em;
+      transition: transform 0.2s;
+    }
+    .brand-item[data-collapsed="true"] .toggle-btn {
+      transform: rotate(-90deg);
+    }
+
+    .brand-item.dragging {
+      opacity: 0.5;
+    }
+
+    .brand-handle {
+      user-select: none;
+      cursor: grab;
+    }
+
+    .admin-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--card);
+      cursor: grab;
+    }
+
+    .admin-item span {
+      flex-grow: 1;
+    }
+
+    .admin-item input {
+      padding: 4px;
+      font-size: 13px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    .admin-item.hidden {
+      display: none;
+    }
+
+    .draggable-handle {
+      cursor: grab;
+      user-select: none;
+    }
+
+  </style>
+</head>
+<body>
+  <header>
+    미구매 문자 자동완성 툴
+    <button id="darkModeToggle" onclick="toggleDarkMode()">🌙</button>
+  </header>
+
+  <div class="top-bar">
+    <label for="branch">지점명</label>
+    <input type="text" id="branch" placeholder="예: 노원점" />
+    <label for="modeSelect" style="margin-left: 20px;">모드 선택</label>
+    <select id="modeSelect">
+      <option value="user" selected>사용자</option>
+      <option value="admin">관리자 모드</option>
+    </select>
+    <input type="password" id="adminPassword" placeholder="관리자 비밀번호" style="margin-left: 10px; display:none;" />
+    <button id="adminLoginBtn" style="display:none; margin-left: 10px;">로그인</button>
+    <!-- 검색 기능 추가 -->
+    <input type="text" id="productSearch" placeholder="제품 검색" />
+  </div>
+
+  <div class="grid" id="categories"></div>
+
+  <div class="buttons">
+    <button id="deselectBtn" onclick="deselectAllProducts()">전체취소</button>
+    <button id="generateBtn" onclick="generateMessage()">메시지 생성</button>
+    <button id="copyBtn" onclick="copyMessage()">복사하기</button>
+  </div>
+
+  <div id="output"></div>
+
+  <div class="admin-panel" id="adminPanel">
+    <h3>제품 및 카테고리 관리</h3>
+    <input type="text" id="adminBrand" placeholder="브랜드명" />
+    <input type="text" id="adminName" placeholder="제품명" />
+    <input type="text" id="adminURL" placeholder="제품 URL" />
+    <button onclick="addProduct()">+ 제품 추가</button>
+
+    <div class="admin-list" id="adminList"></div>
+  </div>
+
+  <script>
+    // 기본 제품 데이터
+    const defaultProducts = {
+      "Z11 (미디엄)": { brand: "베스트슬립", url: "https://buly.kr/15POhev" },
+      "Z11 (소프트)": { brand: "베스트슬립", url: "https://buly.kr/BeKrYbz" },
+      "Z11 (하드)": { brand: "베스트슬립", url: "https://buly.kr/3COUTOA" },
+      "Z10B (미디엄)": { brand: "베스트슬립", url: "https://buly.kr/44yHNYX" },
+      "Z10B (소프트)": { brand: "베스트슬립", url: "https://buly.kr/1c9TId6" },
+      "Z10B (하드)": { brand: "베스트슬립", url: "https://buly.kr/Yf7lEM" },
+      "Z10 (미디엄)": { brand: "베스트슬립", url: "https://buly.kr/8IwSvDm" },
+      "Z10 (소프트)": { brand: "베스트슬립", url: "https://buly.kr/8IwSvE1" },
+      "Z10 (하드)": { brand: "베스트슬립", url: "https://buly.kr/B7aacGl" },
+      "Z8B (미디엄)": { brand: "베스트슬립", url: "https://buly.kr/HHd6wqW" },
+      "Z8B (소프트)": { brand: "베스트슬립", url: "https://buly.kr/H6iLy29" },
+      "Z8B (하드)": { brand: "베스트슬립", url: "https://buly.kr/5fD6Czc" },
+      "Z7 (미디엄)": { brand: "베스트슬립", url: "https://buly.kr/G3Do59M" },
+      "Z7 (소프트)": { brand: "베스트슬립", url: "https://buly.kr/31TjUmf" },
+      "Z7 (하드)": { brand: "베스트슬립", url: "https://buly.kr/NkMmXQ" },
+      "Z5 (미디엄)": { brand: "베스트슬립", url: "https://buly.kr/15POhpH" },
+      "Z5 (소프트)": { brand: "베스트슬립", url: "https://buly.kr/FhOI7Xj" },
+      "Z5 (하드)": { brand: "베스트슬립", url: "https://buly.kr/8elystx" },
+      "L3": { brand: "베스트슬립", url: "https://buly.kr/1ujocT" },
+      "W3": { brand: "베스트슬립", url: "https://buly.kr/6Ms88LB" },
+      "M5": { brand: "베스트슬립", url: "https://buly.kr/2JohZa5" },
+      "M3": { brand: "베스트슬립", url: "https://buly.kr/3j8vVR5" },
+      "M2": { brand: "베스트슬립", url: "https://buly.kr/Aaq4LdF" },
+      "Z11베이스 (블루)": { brand: "베스트슬립", url: "https://buly.kr/1c9o1H5" },
+      "Z11베이스 (그레이)": { brand: "베스트슬립", url: "https://buly.kr/HHdFJsJ" },
+      "Z11베이스 (브라운)": { brand: "베스트슬립", url: "https://buly.kr/ChpIY1F" },
+      "Z0 (블루)": { brand: "베스트슬립", url: "https://buly.kr/31Trrjz" },
+      "Z0 (라이트그레이)": { brand: "베스트슬립", url: "https://buly.kr/CpkAgH" },
+      "Z0 (브라운)": { brand: "베스트슬립", url: "https://buly.kr/A46Cos7" },
+      "Z0 (다크그레이)": { brand: "베스트슬립", url: "https://buly.kr/3YE8oAr" },
+      "히트가더": { brand: "베스트슬립", url: "https://buly.kr/E79dNqL" },
+      "이켈로스23 (미디엄 소프트)": { brand: "브랜드리스", url: "https://buly.kr/1v0uPt" },
+      "이켈로스23 (미디엄 하드)": { brand: "브랜드리스", url: "https://buly.kr/1v0uPt" },
+      "모피어스22 (미디엄 소프트)": { brand: "브랜드리스", url: "https://buly.kr/6MsIDnk" },
+      "모피어스22 (미디엄 하드)": { brand: "브랜드리스", url: "https://buly.kr/6MsIDnk" },
+      "판타소스21 (미디엄 소프트)": { brand: "브랜드리스", url: "https://buly.kr/7x7739M" },
+      "판타소스21 (미디엄 하드)": { brand: "브랜드리스", url: "https://buly.kr/7x7739M" },
+      "녹턴19 (미디엄 소프트)": { brand: "브랜드리스", url: "https://buly.kr/74XK94m" },
+      "녹턴19 (미디엄 하드)": { brand: "브랜드리스", url: "https://buly.kr/74XK94m" },
+      "이켈로스23 토퍼 (미디엄 소프트)": { brand: "브랜드리스", url: "https://buly.kr/G3DyAiS" },
+      "이켈로스23 토퍼 (미디엄 하드)": { brand: "브랜드리스", url: "https://buly.kr/G3DyAiS" },
+      "모피어스22 토퍼 (미디엄 소프트)": { brand: "브랜드리스", url: "https://buly.kr/EdtuKC7" },
+      "모피어스22 토퍼 (미디엄 하드)": { brand: "브랜드리스", url: "https://buly.kr/EdtuKC7" },
+      "녹턴19 토퍼 (미디엄 소프트)": { brand: "브랜드리스", url: "https://buly.kr/BpFmd9K" },
+      "녹턴19 토퍼 (미디엄 하드)": { brand: "브랜드리스", url: "https://buly.kr/BpFmd9K" },
+      "이켈로스23 베이스": { brand: "브랜드리스", url: "https://buly.kr/GZyF7C9" },
+      "모피어스22 베이스": { brand: "브랜드리스", url: "https://buly.kr/2qYivza" },
+      "녹턴19 베이스": { brand: "브랜드리스", url: "https://buly.kr/3u3gURs" },
+      "P7 (미디엄 소프트)": { brand: "엘라비아", url: "https://buly.kr/881s278" },
+      "P7 (미디엄 하드)": { brand: "엘라비아", url: "https://buly.kr/DwEsP2T" },
+      "G5 (미디엄 소프트)": { brand: "엘라비아", url: "https://buly.kr/3j8vVj4" },
+      "G5 (미디엄 하드)": { brand: "엘라비아", url: "https://buly.kr/3u3gUXt" },
+      "C5": { brand: "엘라비아", url: "https://buly.kr/B7aki04" },
+      "C4 (미디엄 소프트)": { brand: "엘라비아", url: "https://buly.kr/2Ujce2q" },
+      "C4 (미디엄 하드)": { brand: "엘라비아", url: "https://buly.kr/2Ujce2q" },
+      "C4 일체형 (미디엄 소프트)": { brand: "엘라비아", url: "https://buly.kr/FsJDC3K" },
+      "C4 일체형 (미디엄 하드)": { brand: "엘라비아", url: "https://buly.kr/FsJDC3K" },
+      "C3": { brand: "엘라비아", url: "https://buly.kr/612mGMD" },
+      "S6": { brand: "엘라비아", url: "https://buly.kr/AllEkOq" },
+      "S5 (미디엄 소프트)": { brand: "엘라비아", url: "https://buly.kr/H6iW3m6" },
+      "S5 (미디엄 하드)": { brand: "엘라비아", url: "https://buly.kr/H6iW3m6" },
+      "S4 (미디엄 소프트)": { brand: "엘라비아", url: "https://buly.kr/3NJPY94" },
+      "S4 (미디엄 하드)": { brand: "엘라비아", url: "https://buly.kr/3NJPY94" },
+      "쿨앤웜 매트리스 토퍼": { brand: "엘라비아", url: "https://buly.kr/BpFmdJL" },
+      "Q3000 (미디엄)": { brand: "퀵슬립", url: "https://buly.kr/9BW1GzZ" },
+      "Q3000 (소프트)": { brand: "퀵슬립", url: "https://buly.kr/9BW1GzZ" },
+      "Q3000 (하드)": { brand: "퀵슬립", url: "https://buly.kr/9BW1GzZ" },
+      "Q3 (미디엄 소프트)": { brand: "퀵슬립", url: "https://buly.kr/3YDprfH" },
+      "Q3 (미디엄 하드)": { brand: "퀵슬립", url: "https://buly.kr/3YDprfH" },
+      "Q4 (미디엄 소프트)": { brand: "퀵슬립", url: "https://buly.kr/6BxN9hl" },
+      "Q4 (미디엄 하드)": { brand: "퀵슬립", url: "https://buly.kr/6BxN9hl" },
+      "Q7 (미디엄 소프트)": { brand: "퀵슬립", url: "https://buly.kr/BIVLbNA" },
+      "Q7 (미디엄 하드)": { brand: "퀵슬립", url: "https://buly.kr/BIVLbNA" },
+      "Q8 (미디엄 소프트)": { brand: "퀵슬립", url: "https://buly.kr/H6i74Kx" },
+      "Q8 (미디엄 하드)": { brand: "퀵슬립", url: "https://buly.kr/H6i74Kx" },
+      "Q9 (미디엄 소프트)": { brand: "퀵슬립", url: "https://buly.kr/C0ANWeJ" },
+      "SB3": { brand: "퀵슬립", url: "https://buly.kr/90bewNl" },
+      "SB5": { brand: "퀵슬립", url: "https://buly.kr/4xYENcC" },
+      "V3": { brand: "퀵슬립", url: "https://buly.kr/9BWPvHg" },
+      "V4": { brand: "퀵슬립", url: "https://buly.kr/FLYpJh6" },
+      "RC2": { brand: "롤링컴포트", url: "https://buly.kr/AwfzjFq" },
+    };
+
+    // 저장된 제품 데이터 및 제품 순서 / 브랜드 순서
+    let productData = JSON.parse(localStorage.getItem("products")) || defaultProducts;
+    let productOrder = JSON.parse(localStorage.getItem("productOrder")) || {};
+    let brandOrder = JSON.parse(localStorage.getItem("brandOrder")) || [];
+    let collapsedState = JSON.parse(localStorage.getItem("collapsedState")) || {};
+
+    // 브랜드별 순서 초기화
+    function ensureBrandOrder() {
+      const grouped = groupByBrand(productData);
+      const brands = Object.keys(grouped);
+      // 브랜드 순서가 비어있거나 브랜드 변경 시 동기화
+      if (brandOrder.length === 0) {
+        brandOrder = brands.slice();
+      } else {
+        // brandOrder에 없는 브랜드 추가
+        brands.forEach(b => {
+          if (!brandOrder.includes(b)) brandOrder.push(b);
+        });
+        // brandOrder에 있지만 제품Data에서 브랜드 사라진 경우 제거
+        brandOrder = brandOrder.filter(b => brands.includes(b));
+      }
+    }
+
+    // 브랜드별 제품 순서 초기화
+    function ensureProductOrder() {
+      const grouped = groupByBrand(productData);
+      for (const brand in grouped) {
+        if (!productOrder[brand]) {
+          productOrder[brand] = grouped[brand].slice();
+        } else {
+          // 삭제된 제품 제거
+          const existing = productOrder[brand];
+          const names = grouped[brand];
+          productOrder[brand] = existing.filter(n => names.includes(n));
+          names.forEach(n => {
+            if (!productOrder[brand].includes(n)) {
+              productOrder[brand].push(n);
+            }
+          });
+        }
+      }
+      // 브랜드 사라진 경우 productOrder에서 정리
+      for (const brand in productOrder) {
+        if (!(brand in groupByBrand(productData))) {
+          delete productOrder[brand];
+        }
+      }
+    }
+
+    function groupByBrand(data) {
+      const map = {};
+      for (const name in data) {
+        const brand = data[name].brand;
+        if (!map[brand]) map[brand] = [];
+        map[brand].push(name);
+      }
+      return map;
+    }
+
+    function renderCategories() {
+      const container = document.getElementById("categories");
+      container.innerHTML = "";
+      ensureBrandOrder();
+      ensureProductOrder();
+      const grouped = groupByBrand(productData);
+
+      // 브랜드 순서에 따라 카테고리 렌더
+      brandOrder.forEach(brand => {
+        if (!(brand in grouped)) return;
+        const div = document.createElement("div");
+        div.className = "category";
+
+        if (grouped[brand].length > 3) {
+          div.style.maxHeight = "200px";
+          div.style.overflowY = "auto";
+        }
+
+        const brandHeader = document.createElement("div");
+        brandHeader.className = "category-header";
+        brandHeader.textContent = brand;
+        div.appendChild(brandHeader);
+
+        // 제품 내 순서대로 버튼 배치
+        productOrder[brand].forEach(name => {
+          if (!(name in productData)) return;
+          const btn = document.createElement("button");
+          btn.textContent = name;
+          btn.className = "product-button";
+          btn.onclick = () => btn.classList.toggle("selected");
+          div.appendChild(btn);
+        });
+
+        container.appendChild(div);
+      });
+    }
+    
+    // 제품 검색 기능
+    const productSearchInput = document.getElementById('productSearch');
+    productSearchInput.addEventListener('keyup', (event) => {
+        const searchTerm = event.target.value.trim().toLowerCase();
+        const productButtons = document.querySelectorAll('.product-button');
+        
+        productButtons.forEach(button => {
+            const productName = button.textContent.toLowerCase();
+            if (productName.includes(searchTerm)) {
+                button.style.display = 'block';
+            } else {
+                button.style.display = 'none';
+            }
+        });
+    });
+
+    function generateMessage() {
+      const branch = document.getElementById("branch").value.trim();
+      if (!branch) return alert("지점명을 입력해주세요.");
+
+      const selected = document.querySelectorAll(".product-button.selected");
+      if (selected.length === 0) return alert("제품을 하나 이상 선택해주세요.");
+
+      const names = [...selected].map(btn => btn.textContent);
+      let detail = "";
+      names.forEach(name => {
+        const info = productData[name];
+        if (info) detail += `[${info.brand}] ${name}\n(${info.url})\n\n`;
+      });
+
+      const message = `
+안녕하세요, 고객님 
+방문해 주셨던 베스트슬립 ${branch}입니다. 방문시 체험하신 제품의 정보 상세히 송부드립니다. 
+저희 체험관을 찾아주셔서 진심으로 감사드립니다. 
+
+🎁매장 방문시 풍성한 혜택제공🎁
+혹여 재방문이 어려우실 경우, 전화주문도 가능합니다.(카드 결제, 무이자할부, 네이버 페이 가능) 
+
+고객님께서 체험하셨던 ${names.join(", ")} 입니다
+
+${detail.trim()}
+
+문의 사항 있으시면 언제든지 연락해 주세요 :)
+
+🌈체험관을 통해 구매하시면 
+1️⃣온오프라인 통합 최저가 수준의 판매가
+2️⃣사은품 증정 (온라인 구매 시 미증정) 
+3️⃣빠른 주문접수 및 배송 안내 
+4️⃣AS 발생 시 수월한 처리 등 
+5️⃣도도포인트적립(구매금액의 1.7%)
+
+좋은 혜택을 많이 받아 가실 수 있습니다. 
+그럼, 오늘도 행복한 하루 보내시고 
+숙면 취하시길 바랍니다. 감사합니다:)
+      `.trim();
+
+      document.getElementById("output").textContent = message;
+      document.getElementById("copyBtn").style.display = "inline-block";
+    }
+
+    function deselectAllProducts() {
+      const selectedButtons = document.querySelectorAll(".product-button.selected");
+      selectedButtons.forEach(button => {
+        button.classList.remove("selected");
+      });
+      document.getElementById("output").textContent = "";
+      document.getElementById("copyBtn").style.display = "none";
+    }
+
+    function copyMessage() {
+      const message = document.getElementById("output").textContent;
+      navigator.clipboard.writeText(message).then(() => {
+        alert("메시지가 복사되었습니다.");
+      });
+    }
+
+    // 관리자 모드 UI
+    const modeSelect = document.getElementById("modeSelect");
+    const adminPassword = document.getElementById("adminPassword");
+    const adminLoginBtn = document.getElementById("adminLoginBtn");
+    const adminPanel = document.getElementById("adminPanel");
+
+    modeSelect.addEventListener("change", () => {
+      if (modeSelect.value === "admin") {
+        adminPassword.style.display = "inline-block";
+        adminLoginBtn.style.display = "inline-block";
+      } else {
+        adminPassword.style.display = "none";
+        adminLoginBtn.style.display = "none";
+        adminPanel.style.display = "none";
+      }
+    });
+
+    adminLoginBtn.addEventListener("click", () => {
+      const pw = adminPassword.value.trim();
+      if (pw === "040305") {
+        alert("관리자 로그인 성공");
+        adminPanel.style.display = "block";
+        renderAdminList();
+      } else {
+        alert("비밀번호가 틀렸습니다.");
+      }
+    });
+
+    function addProduct() {
+      const brand = document.getElementById("adminBrand").value.trim();
+      const name = document.getElementById("adminName").value.trim();
+      const url = document.getElementById("adminURL").value.trim();
+      if (!brand || !name || !url) {
+        alert("브랜드명, 제품명, URL 모두 입력해주세요.");
+        return;
+      }
+      if (productData[name]) {
+        alert("이미 존재하는 제품명입니다.");
+        return;
+      }
+      productData[name] = { brand, url };
+      if (!productOrder[brand]) productOrder[brand] = [];
+      productOrder[brand].push(name);
+      // 브랜드가 brandOrder에 없으면 추가
+      if (!brandOrder.includes(brand)) brandOrder.push(brand);
+      if (!collapsedState[brand]) collapsedState[brand] = false;
+
+      saveAllData();
+      renderCategories();
+      renderAdminList();
+
+      document.getElementById("adminBrand").value = "";
+      document.getElementById("adminName").value = "";
+      document.getElementById("adminURL").value = "";
+    }
+
+    function removeProduct(name) {
+      if (confirm(`제품 "${name}"을(를) 삭제하시겠습니까?`)) {
+        const brand = productData[name].brand;
+        delete productData[name];
+        if (productOrder[brand]) {
+          productOrder[brand] = productOrder[brand].filter(n => n !== name);
+        }
+        // 만약 브랜드에 제품이 하나도 남지 않으면 브랜드 자체도 제거
+        if (productOrder[brand] && productOrder[brand].length === 0) {
+          delete productOrder[brand];
+          brandOrder = brandOrder.filter(b => b !== brand);
+          delete collapsedState[brand];
+        }
+        saveAllData();
+        renderCategories();
+        renderAdminList();
+      }
+    }
+
+    function enterEditMode(container, oldName, oldData) {
+      container.innerHTML = "";
+
+      const brandInput = document.createElement("input");
+      brandInput.value = oldData.brand;
+
+      const nameInput = document.createElement("input");
+      nameInput.value = oldName;
+
+      const urlInput = document.createElement("input");
+      urlInput.value = oldData.url;
+
+      const saveBtn = document.createElement("button");
+      saveBtn.textContent = "💾 저장";
+      saveBtn.onclick = () => {
+        const newBrand = brandInput.value.trim();
+        const newName = nameInput.value.trim();
+        const newURL = urlInput.value.trim();
+
+        if (!newBrand || !newName || !newURL) {
+          alert("모든 값을 입력해주세요.");
+          return;
+        }
+
+        if (newName !== oldName) {
+          // oldName 키 제거
+          delete productData[oldName];
+        }
+
+        // 브랜드 변경 시 순서에서 조정
+        if (newBrand !== oldData.brand) {
+          // old 브랜드 순서에서 제거
+          if (productOrder[oldData.brand]) {
+            productOrder[oldData.brand] = productOrder[oldData.brand].filter(n => n !== oldName);
+          }
+          // 새 브랜드가 brandOrder에 없으면 추가
+          if (!brandOrder.includes(newBrand)) brandOrder.push(newBrand);
+          if (!collapsedState[newBrand]) collapsedState[newBrand] = false;
+        }
+
+        productData[newName] = { brand: newBrand, url: newURL };
+
+        // 새브랜드 순서에 제품 추가
+        if (!productOrder[newBrand]) productOrder[newBrand] = [];
+        if (!productOrder[newBrand].includes(newName)) {
+          productOrder[newBrand].push(newName);
+        }
+
+        // 만약 old브랜드에 제품이 하나도 남지 않으면 브랜드 제거
+        if (productOrder[oldData.brand] && productOrder[oldData.brand].length === 0) {
+          delete productOrder[oldData.brand];
+          brandOrder = brandOrder.filter(b => b !== oldData.brand);
+          delete collapsedState[oldData.brand];
+        }
+
+        saveAllData();
+        renderCategories();
+        renderAdminList();
+      };
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.textContent = "❌ 취소";
+      cancelBtn.onclick = () => renderAdminList();
+
+      container.appendChild(brandInput);
+      container.appendChild(nameInput);
+      container.appendChild(urlInput);
+      container.appendChild(saveBtn);
+      container.appendChild(cancelBtn);
+    }
+
+    // 카테고리 접기/펴기 로직
+    function toggleAdminCategory(event) {
+      const brandItem = event.currentTarget;
+      const brand = brandItem.dataset.brand;
+      
+      const isCollapsed = brandItem.dataset.collapsed === "true";
+      brandItem.dataset.collapsed = !isCollapsed;
+      collapsedState[brand] = !isCollapsed;
+      saveAllData();
+
+      const list = document.getElementById("adminList");
+      let foundBrand = false;
+      Array.from(list.children).forEach(child => {
+        if (child === brandItem) {
+          foundBrand = true;
+          return;
+        }
+        if (foundBrand) {
+          if (child.classList.contains('brand-item')) {
+            foundBrand = false;
+          } else if (child.classList.contains('admin-item') && child.dataset.brand === brand) {
+            child.classList.toggle('hidden', !isCollapsed);
+          }
+        }
+      });
+    }
+
+    function renderAdminList() {
+      const list = document.getElementById("adminList");
+      list.innerHTML = "";
+      ensureBrandOrder();
+      ensureProductOrder();
+      const grouped = groupByBrand(productData);
+
+      // 브랜드 항목 리스트 (브랜드 순서 변경 가능)
+      brandOrder.forEach(brand => {
+        const bdiv = document.createElement("div");
+        bdiv.className = "brand-item";
+        bdiv.draggable = true;
+        bdiv.dataset.brand = brand;
+        // 접기/펴기 상태 적용
+        const isCollapsed = collapsedState[brand] || false;
+        bdiv.dataset.collapsed = isCollapsed;
+        bdiv.onclick = toggleAdminCategory;
+
+        const handle = document.createElement("span");
+        handle.className = "brand-handle";
+        handle.textContent = "≡"; 
+        bdiv.appendChild(handle);
+
+        const bspan = document.createElement("span");
+        bspan.textContent = brand;
+        bdiv.appendChild(bspan);
+
+        const toggleBtn = document.createElement("span");
+        toggleBtn.className = "toggle-btn";
+        toggleBtn.textContent = "▼";
+        bdiv.appendChild(toggleBtn);
+        
+        list.appendChild(bdiv);
+
+        // 제품 항목들
+        productOrder[brand].forEach(name => {
+          if (!(name in productData)) return;
+          const data = productData[name];
+          const div = document.createElement("div");
+          div.className = "admin-item";
+          div.draggable = true;
+          div.dataset.productName = name;
+          div.dataset.brand = brand;
+          // 접기/펴기 상태에 따라 초기 숨김 처리
+          if (isCollapsed) {
+            div.classList.add('hidden');
+          }
+
+          const handle2 = document.createElement("span");
+          handle2.className = "draggable-handle";
+          handle2.textContent = "≡";
+          div.appendChild(handle2);
+
+          const span = document.createElement("span");
+          span.textContent = `${data.brand} - ${name}`;
+          div.appendChild(span);
+
+          const editBtn = document.createElement("button");
+          editBtn.textContent = "✏️ 수정";
+          editBtn.onclick = (e) => {
+            e.stopPropagation(); // 이벤트 버블링 방지
+            enterEditMode(div, name, data);
+          };
+          div.appendChild(editBtn);
+
+          const deleteBtn = document.createElement("button");
+          deleteBtn.textContent = "❌ 삭제";
+          deleteBtn.onclick = (e) => {
+            e.stopPropagation(); // 이벤트 버블링 방지
+            removeProduct(name);
+          };
+          div.appendChild(deleteBtn);
+
+          list.appendChild(div);
+        });
+      });
+
+      addDragAndDropListenersAdmin();
+    }
+
+    function addDragAndDropListenersAdmin() {
+      const list = document.getElementById("adminList");
+      let dragSrcEl = null;
+      let dragType = null; // "brand" or "product"
+
+      // 이벤트 핸들러 추가
+      list.querySelectorAll('.brand-item, .admin-item').forEach(item => {
+        item.addEventListener('dragstart', (e) => {
+          dragSrcEl = item;
+          dragType = item.classList.contains('brand-item') ? 'brand' : 'product';
+          item.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', null);
+        });
+
+        item.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          const target = e.target.closest('.brand-item, .admin-item');
+          if (!target || target === dragSrcEl) return;
+          // 브랜드 아이템 드래그 중일 때
+          if (dragType === 'brand' && target.classList.contains('brand-item')) {
+            const bounding = target.getBoundingClientRect();
+            const offset = e.clientY - bounding.top;
+            if (offset > bounding.height / 2) {
+              list.insertBefore(dragSrcEl, target.nextSibling);
+            } else {
+              list.insertBefore(dragSrcEl, target);
+            }
+          }
+          // 제품 아이템 드래그 중일 때
+          if (dragType === 'product' && target.classList.contains('admin-item')) {
+            // 제품은 같은 브랜드 내에서만 순서 변경 허용
+            if (target.dataset.brand === dragSrcEl.dataset.brand) {
+              const bounding2 = target.getBoundingClientRect();
+              const offset2 = e.clientY - bounding2.top;
+              if (offset2 > bounding2.height / 2) {
+                list.insertBefore(dragSrcEl, target.nextSibling);
+              } else {
+                list.insertBefore(dragSrcEl, target);
+              }
+            }
+          }
+        });
+
+        item.addEventListener('dragend', () => {
+          item.classList.remove('dragging');
+          saveOrderFromAdminListAdmin();
+        });
+      });
+    }
+
+    function saveOrderFromAdminListAdmin() {
+      const list = document.getElementById("adminList");
+      const newBrandOrder = [];
+      const newProductOrder = {};
+
+      let currentBrand = null;
+      Array.from(list.children).forEach(child => {
+        if (child.classList.contains('brand-item')) {
+          const brand = child.dataset.brand;
+          currentBrand = brand;
+          if (!newBrandOrder.includes(brand)) {
+            newBrandOrder.push(brand);
+          }
+          if (!newProductOrder[brand]) {
+            newProductOrder[brand] = [];
+          }
+        } else if (child.classList.contains('admin-item')) {
+          const name = child.dataset.productName;
+          const brand = child.dataset.brand;
+          if (brand === currentBrand) {
+            newProductOrder[brand].push(name);
+          } else {
+            // 브랜드 헤더랑 매치 안되는 경우는 무시하거나 brand 정보 사용
+            if (!newProductOrder[brand]) newProductOrder[brand] = [];
+            newProductOrder[brand].push(name);
+          }
+        }
+      });
+
+      brandOrder = newBrandOrder;
+      productOrder = newProductOrder;
+      saveAllData();
+      renderCategories();
+      renderAdminList();
+    }
+
+    function saveAllData() {
+      localStorage.setItem("products", JSON.stringify(productData));
+      localStorage.setItem("productOrder", JSON.stringify(productOrder));
+      localStorage.setItem("brandOrder", JSON.stringify(brandOrder));
+      localStorage.setItem("collapsedState", JSON.stringify(collapsedState));
+    }
+
+    function toggleDarkMode() {
+      document.body.classList.toggle("dark");
+    }
+
+    // 초기 렌더
+    renderCategories();
+
+  </script>
+</body>
+</html>
