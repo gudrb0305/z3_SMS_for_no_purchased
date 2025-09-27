@@ -295,6 +295,7 @@
       border: 1px solid var(--border);
       border-radius: 6px;
       background: var(--card);
+      cursor: grab;
     }
 
     .admin-item span {
@@ -332,7 +333,6 @@
       <option value="user" selected>사용자</option>
       <option value="admin">관리자 모드</option>
     </select>
-    <!-- 해당 요소들은 '사용자' 모드에서는 숨겨져 있습니다. -->
     <input type="password" id="adminPassword" placeholder="관리자 비밀번호" style="margin-left: 10px; display:none;" />
     <button id="adminLoginBtn" style="display:none; margin-left: 10px;">로그인</button>
     <!-- 검색 기능 추가 -->
@@ -351,7 +351,6 @@
 
   <div class="admin-panel" id="adminPanel">
     <h3>제품 및 카테고리 관리</h3>
-    <p class="text-xs text-gray-600 mb-4">모든 변경 사항은 Firebase Firestore에 실시간으로 저장됩니다.</p>
     <input type="text" id="adminBrand" placeholder="브랜드명" />
     <input type="text" id="adminName" placeholder="제품명" />
     <input type="text" id="adminURL" placeholder="제품 URL" />
@@ -360,24 +359,8 @@
     <div class="admin-list" id="adminList"></div>
   </div>
 
-  <script type="module">
-    // Firebase 모듈 임포트
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-    // 전역 변수 설정 (플랫폼 환경에서 자동으로 제공됨)
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-    let app, db, auth;
-    let currentUserId = null;
-    let isFirebaseReady = false;
-    const CONFIG_DOC_PATH = "app_configs"; // Firestore 컬렉션 이름
-    const CONFIG_DOC_ID = "sms_tool_config"; // Firestore 문서 ID
-
-    // 기본 제품 데이터 (Firestore에서 데이터를 불러오지 못할 경우 사용)
+  <script>
+    // 기본 제품 데이터
     const defaultProducts = {
       "Z11 (미디엄)": { brand: "베스트슬립", url: "https://buly.kr/15POhev" },
       "Z11 (소프트)": { brand: "베스트슬립", url: "https://buly.kr/BeKrYbz" },
@@ -462,129 +445,11 @@
       "RC2": { brand: "롤링컴포트", url: "https://buly.kr/AwfzjFq" },
     };
 
-    // 저장된 제품 데이터 및 제품 순서 / 브랜드 순서. 이제 localStorage 대신 Firestore에서 로드됨.
-    // 초기에는 기본값 또는 빈 객체로 시작.
-    let productData = defaultProducts; 
-    let productOrder = {};
-    let brandOrder = [];
-    let collapsedState = {};
-
-    /**
-     * Firebase를 초기화하고 사용자 인증 상태를 설정합니다.
-     */
-    async function initFirebase() {
-        if (!firebaseConfig) {
-            console.error("오류: Firebase 설정 정보를 찾을 수 없습니다.");
-            return;
-        }
-
-        try {
-            // 1. Firebase 앱 초기화
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
-
-            // 2. 인증 상태 변경 리스너 설정
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    currentUserId = user.uid;
-                    isFirebaseReady = true;
-                    console.log("Firebase 인증 성공. User ID:", currentUserId);
-                    loadDataFromFirebase(); // 인증 후 데이터 로드 시작
-                } else {
-                    currentUserId = null;
-                    isFirebaseReady = false;
-                    console.log("Firebase 인증 상태 변경: 로그아웃 또는 인증 오류");
-                    // 익명 로그인 또는 커스텀 토큰 로그인 시도
-                    if (initialAuthToken) {
-                        signInWithCustomToken(auth, initialAuthToken).catch(err => {
-                             console.error("Custom token 로그인 실패:", err);
-                             signInAnonymously(auth); // 익명 로그인으로 대체 시도
-                        });
-                    } else {
-                        signInAnonymously(auth);
-                    }
-                }
-            });
-
-        } catch (error) {
-            console.error("Firebase 초기화 중 오류 발생:", error);
-        }
-    }
-
-    /**
-     * Cloud Firestore에서 사용자 설정 데이터를 실시간으로 불러옵니다 (onSnapshot 사용).
-     */
-    function loadDataFromFirebase() {
-        if (!isFirebaseReady || !currentUserId) return;
-
-        // DB 경로: /artifacts/{appId}/users/{userId}/app_configs/sms_tool_config
-        const configDocRef = doc(db, 'artifacts', appId, 'users', currentUserId, CONFIG_DOC_PATH, CONFIG_DOC_ID);
-        
-        onSnapshot(configDocRef, (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                // Firestore에서 불러온 데이터를 전역 변수에 반영
-                productData = data.products || defaultProducts;
-                productOrder = data.productOrder || {};
-                brandOrder = data.brandOrder || [];
-                collapsedState = data.collapsedState || {};
-                console.log("Firestore에서 데이터가 성공적으로 로드되었습니다.");
-            } else {
-                console.log("설정 문서가 없습니다. 기본 데이터 사용 및 Firestore에 저장 시도.");
-                // 문서가 없으면 기본 데이터를 Firestore에 저장하여 초기화
-                saveAllData(true); 
-            }
-            // 데이터 로드 또는 기본값 설정 후 UI 렌더링
-            renderCategories();
-            // 관리자 패널이 열려있다면 목록도 갱신
-            if (document.getElementById("adminPanel").style.display === "block") {
-                renderAdminList();
-            }
-        }, (error) => {
-            console.error("Firestore에서 데이터 로드 중 오류 발생 (onSnapshot):", error);
-        });
-    }
-
-    /**
-     * 모든 설정 데이터를 Cloud Firestore에 저장합니다 (localStorage 대체).
-     * @param {boolean} force - Firebase 준비 여부와 관계없이 저장 시도 (초기 데이터 저장용)
-     */
-    async function saveAllData(force = false) {
-        if (!isFirebaseReady || !currentUserId) {
-            if (!force) console.warn("Firebase가 준비되지 않았습니다. 데이터를 저장할 수 없습니다.");
-            return;
-        }
-
-        try {
-            const configDocRef = doc(db, 'artifacts', appId, 'users', currentUserId, CONFIG_DOC_PATH, CONFIG_DOC_ID);
-
-            const dataToSave = {
-                products: productData,
-                productOrder: productOrder,
-                brandOrder: brandOrder,
-                collapsedState: collapsedState,
-                lastUpdated: new Date().toISOString()
-            };
-
-            // setDoc을 사용하여 문서에 데이터를 덮어씁니다.
-            await setDoc(configDocRef, dataToSave);
-            // console.log("데이터가 Firestore에 성공적으로 저장되었습니다.");
-        } catch (error) {
-            console.error("Firestore에 데이터 저장 중 오류 발생:", error);
-        }
-    }
-
-
-    function groupByBrand(data) {
-      const map = {};
-      for (const name in data) {
-        const brand = data[name].brand;
-        if (!map[brand]) map[brand] = [];
-        map[brand].push(name);
-      }
-      return map;
-    }
+    // 저장된 제품 데이터 및 제품 순서 / 브랜드 순서
+    let productData = JSON.parse(localStorage.getItem("products")) || defaultProducts;
+    let productOrder = JSON.parse(localStorage.getItem("productOrder")) || {};
+    let brandOrder = JSON.parse(localStorage.getItem("brandOrder")) || [];
+    let collapsedState = JSON.parse(localStorage.getItem("collapsedState")) || {};
 
     // 브랜드별 순서 초기화
     function ensureBrandOrder() {
@@ -629,6 +494,15 @@
       }
     }
 
+    function groupByBrand(data) {
+      const map = {};
+      for (const name in data) {
+        const brand = data[name].brand;
+        if (!map[brand]) map[brand] = [];
+        map[brand].push(name);
+      }
+      return map;
+    }
 
     function renderCategories() {
       const container = document.getElementById("categories");
@@ -685,18 +559,10 @@
 
     function generateMessage() {
       const branch = document.getElementById("branch").value.trim();
-      if (!branch) {
-        // alert 대신 커스텀 메시지 박스 사용
-        showMessageBox("지점명을 입력해주세요.", "warn");
-        return;
-      }
+      if (!branch) return alert("지점명을 입력해주세요.");
 
       const selected = document.querySelectorAll(".product-button.selected");
-      if (selected.length === 0) {
-        // alert 대신 커스텀 메시지 박스 사용
-        showMessageBox("제품을 하나 이상 선택해주세요.", "warn");
-        return;
-      }
+      if (selected.length === 0) return alert("제품을 하나 이상 선택해주세요.");
 
       const names = [...selected].map(btn => btn.textContent);
       let detail = "";
@@ -745,49 +611,10 @@ ${detail.trim()}
     }
 
     function copyMessage() {
-      // navigator.clipboard.writeText()는 iframe 환경에서 제한될 수 있으므로, document.execCommand('copy')를 사용합니다.
       const message = document.getElementById("output").textContent;
-      const tempTextArea = document.createElement("textarea");
-      tempTextArea.value = message;
-      document.body.appendChild(tempTextArea);
-      tempTextArea.select();
-      
-      try {
-        const successful = document.execCommand('copy');
-        const msg = successful ? '메시지가 복사되었습니다.' : '복사에 실패했습니다.';
-        showMessageBox(msg, successful ? "success" : "danger");
-      } catch (err) {
-        showMessageBox('복사 중 오류가 발생했습니다.', "danger");
-      }
-      
-      document.body.removeChild(tempTextArea);
-    }
-    
-    // Alert() 대신 사용할 커스텀 메시지 박스 구현 (간단 버전)
-    function showMessageBox(message, type) {
-        const colorMap = {
-            'warn': 'var(--warn)',
-            'success': 'var(--success)',
-            'danger': 'var(--danger)'
-        };
-        
-        const style = `position: fixed; top: 10px; right: 10px; padding: 10px 20px; background: ${colorMap[type] || 'gray'}; color: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 1000; transition: opacity 0.3s ease-in-out;`;
-        
-        let box = document.getElementById('custom-message-box');
-        if (!box) {
-            box = document.createElement('div');
-            box.id = 'custom-message-box';
-            document.body.appendChild(box);
-        }
-        
-        box.style.cssText = style;
-        box.textContent = message;
-        box.style.opacity = 1;
-
-        clearTimeout(box.timer);
-        box.timer = setTimeout(() => {
-            box.style.opacity = 0;
-        }, 3000);
+      navigator.clipboard.writeText(message).then(() => {
+        alert("메시지가 복사되었습니다.");
+      });
     }
 
     // 관리자 모드 UI
@@ -800,7 +627,6 @@ ${detail.trim()}
       if (modeSelect.value === "admin") {
         adminPassword.style.display = "inline-block";
         adminLoginBtn.style.display = "inline-block";
-        adminPassword.focus();
       } else {
         adminPassword.style.display = "none";
         adminLoginBtn.style.display = "none";
@@ -810,13 +636,12 @@ ${detail.trim()}
 
     adminLoginBtn.addEventListener("click", () => {
       const pw = adminPassword.value.trim();
-      // 비밀번호는 "040305"로 설정되어 있습니다.
       if (pw === "040305") {
-        showMessageBox("관리자 로그인 성공", "success");
+        alert("관리자 로그인 성공");
         adminPanel.style.display = "block";
         renderAdminList();
       } else {
-        showMessageBox("비밀번호가 틀렸습니다.", "danger");
+        alert("비밀번호가 틀렸습니다.");
       }
     });
 
@@ -825,11 +650,11 @@ ${detail.trim()}
       const name = document.getElementById("adminName").value.trim();
       const url = document.getElementById("adminURL").value.trim();
       if (!brand || !name || !url) {
-        showMessageBox("브랜드명, 제품명, URL 모두 입력해주세요.", "warn");
+        alert("브랜드명, 제품명, URL 모두 입력해주세요.");
         return;
       }
       if (productData[name]) {
-        showMessageBox("이미 존재하는 제품명입니다.", "warn");
+        alert("이미 존재하는 제품명입니다.");
         return;
       }
       productData[name] = { brand, url };
@@ -839,7 +664,9 @@ ${detail.trim()}
       if (!brandOrder.includes(brand)) brandOrder.push(brand);
       if (!collapsedState[brand]) collapsedState[brand] = false;
 
-      saveAllData(); // Firebase에 저장
+      saveAllData();
+      renderCategories();
+      renderAdminList();
 
       document.getElementById("adminBrand").value = "";
       document.getElementById("adminName").value = "";
@@ -847,21 +674,22 @@ ${detail.trim()}
     }
 
     function removeProduct(name) {
-        // confirm 대신 커스텀 메시지 박스 사용 (여기서는 간단히 프롬프트 사용)
-        if (confirm(`제품 "${name}"을(를) 삭제하시겠습니까?`)) { 
-            const brand = productData[name].brand;
-            delete productData[name];
-            if (productOrder[brand]) {
-            productOrder[brand] = productOrder[brand].filter(n => n !== name);
-            }
-            // 만약 브랜드에 제품이 하나도 남지 않으면 브랜드 자체도 제거
-            if (productOrder[brand] && productOrder[brand].length === 0) {
-            delete productOrder[brand];
-            brandOrder = brandOrder.filter(b => b !== brand);
-            delete collapsedState[brand];
-            }
-            saveAllData(); // Firebase에 저장
+      if (confirm(`제품 "${name}"을(를) 삭제하시겠습니까?`)) {
+        const brand = productData[name].brand;
+        delete productData[name];
+        if (productOrder[brand]) {
+          productOrder[brand] = productOrder[brand].filter(n => n !== name);
         }
+        // 만약 브랜드에 제품이 하나도 남지 않으면 브랜드 자체도 제거
+        if (productOrder[brand] && productOrder[brand].length === 0) {
+          delete productOrder[brand];
+          brandOrder = brandOrder.filter(b => b !== brand);
+          delete collapsedState[brand];
+        }
+        saveAllData();
+        renderCategories();
+        renderAdminList();
+      }
     }
 
     function enterEditMode(container, oldName, oldData) {
@@ -884,7 +712,7 @@ ${detail.trim()}
         const newURL = urlInput.value.trim();
 
         if (!newBrand || !newName || !newURL) {
-          showMessageBox("모든 값을 입력해주세요.", "warn");
+          alert("모든 값을 입력해주세요.");
           return;
         }
 
@@ -919,7 +747,9 @@ ${detail.trim()}
           delete collapsedState[oldData.brand];
         }
 
-        saveAllData(); // Firebase에 저장
+        saveAllData();
+        renderCategories();
+        renderAdminList();
       };
 
       const cancelBtn = document.createElement("button");
@@ -938,14 +768,10 @@ ${detail.trim()}
       const brandItem = event.currentTarget;
       const brand = brandItem.dataset.brand;
       
-      // 접기/펴기 버튼 클릭이 아니면 무시
-      if (event.target.classList.contains('brand-handle')) return; 
-      if (event.target.tagName === 'SPAN' && event.target.textContent === brand) return; 
-
       const isCollapsed = brandItem.dataset.collapsed === "true";
       brandItem.dataset.collapsed = !isCollapsed;
       collapsedState[brand] = !isCollapsed;
-      saveAllData(); // Firebase에 저장
+      saveAllData();
 
       const list = document.getElementById("adminList");
       let foundBrand = false;
@@ -1126,18 +952,25 @@ ${detail.trim()}
 
       brandOrder = newBrandOrder;
       productOrder = newProductOrder;
-      saveAllData(); // Firebase에 저장
+      saveAllData();
+      renderCategories();
+      renderAdminList();
     }
 
-    // function saveAllData() { ... } // 이 함수는 위에서 Firebase 버전으로 재정의되었습니다.
-    
+    function saveAllData() {
+      localStorage.setItem("products", JSON.stringify(productData));
+      localStorage.setItem("productOrder", JSON.stringify(productOrder));
+      localStorage.setItem("brandOrder", JSON.stringify(brandOrder));
+      localStorage.setItem("collapsedState", JSON.stringify(collapsedState));
+    }
+
     function toggleDarkMode() {
       document.body.classList.toggle("dark");
     }
 
-    // 초기 실행: Firebase 초기화 및 데이터 로드 시작
-    initFirebase();
-    
+    // 초기 렌더
+    renderCategories();
+
   </script>
 </body>
 </html>
